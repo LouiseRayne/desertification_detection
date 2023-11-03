@@ -2,6 +2,14 @@
 // louiserayne@googlemail.com (louise.rayne@ncl.ac.uk)
 // To modify the script, input your own AOI and training data. 
 
+
+
+// This section defines a geometry variable 'geometry' using the ee.Geometry.Polygon constructor.
+// It represents a rectangular area defined by a set of coordinates.
+// The coordinates form a rectangle with corners at specific latitudes and longitudes.
+// The 'null' argument indicates that no properties are associated with this geometry.
+// The 'false' argument indicates that this is not a filled polygon.
+
 var geometry = 
     /* color: #d63000 */
     /* shown: false */
@@ -10,12 +18,18 @@ var geometry =
         "type": "rectangle"
       }
     ] */
-    ee.Geometry.Polygon(
+ee.Geometry.Polygon(
         [[[-6.645711177723698, 31.149571703840472],
           [-6.645711177723698, 31.007255068271363],
           [-6.529668086903386, 31.007255068271363],
-          [-6.529668086903386, 31.149571703840472]]], null, false),
-    Builtup = 
+          [-6.529668086903386, 31.149571703840472]]], null, false);
+
+// This section defines a variable 'Builtup' as an ee.FeatureCollection.
+// Inside the feature collection, there is a list of features defined by ee.Feature().
+// Each feature represents a polygon defined by specific latitude and longitude coordinates.
+// Each feature also has properties, including 'landcover' and 'system:index', which are associated with it.
+
+var Builtup = 
     /* color: #e816f0 */
     /* shown: false */
     ee.FeatureCollection(
@@ -403,8 +417,14 @@ var geometry =
             {
               "landcover": 150,
               "system:index": "37"
-            })]),
-    Bare = /* color: #5b5957 */ee.FeatureCollection(
+            })]);
+
+// This section defines a variable 'Bare' as an ee.FeatureCollection.
+// Inside the feature collection, there is a list of features defined by ee.Feature().
+// Each feature represents a polygon defined by specific latitude and longitude coordinates.
+// Each feature also has properties, including 'landcover' and 'system:index', which are associated with it.
+
+var Bare = /* color: #5b5957 */ee.FeatureCollection(
         [ee.Feature(
             ee.Geometry.Polygon(
                 [[[-6.556832125732963, 31.11424083021789],
@@ -768,8 +788,14 @@ var geometry =
             {
               "landcover": 60,
               "system:index": "34"
-            })]),
-    Treecover = 
+            })]);
+
+// This section defines a variable 'Treecover' as an ee.FeatureCollection.
+// Inside the feature collection, there is a list of features defined by ee.Feature().
+// Each feature represents a polygon defined by specific latitude and longitude coordinates.
+// Each feature also has properties, including 'landcover' and 'system:index', which are associated with it.
+
+var Treecover = 
     /* color: #d63000 */
     /* shown: false */
     ee.FeatureCollection(
@@ -1076,8 +1102,14 @@ var geometry =
             {
               "landcover": 10,
               "system:index": "29"
-            })]),
-    Cropland = 
+            })]);
+
+// This section defines a variable 'Cropland' as an ee.FeatureCollection.
+// Inside the feature collection, there is a list of features defined by ee.Feature().
+// Each feature represents a polygon defined by specific latitude and longitude coordinates.
+// Each feature also has properties, including 'landcover' and 'system:index', which are associated with it.
+
+var Cropland = 
     /* color: #98ff00 */
     /* shown: false */
     ee.FeatureCollection(
@@ -1384,8 +1416,14 @@ var geometry =
             {
               "landcover": 40,
               "system:index": "29"
-            })]),
-    Desertified = /* color: #0b4a8b */ee.FeatureCollection(
+            })]);
+
+// This section defines a variable 'Desertified' as an ee.FeatureCollection.
+// Inside the feature collection, there is a list of features defined by ee.Feature().
+// Each feature represents a polygon defined by specific latitude and longitude coordinates.
+// Each feature also has properties, including 'landcover' and 'system:index', which are associated with it.
+
+var Desertified = /* color: #0b4a8b */ee.FeatureCollection(
         [ee.Feature(
             ee.Geometry.Polygon(
                 [[[-6.582921740235892, 31.11879353038119],
@@ -1811,6 +1849,8 @@ var geometry =
 
  
 //Sentinel-2
+// This function takes a Sentinel-2 image as input, processes it to mask out // clouds and cirrus clouds, scales the values, and selects the relevant bands. 
+
 function maskS2clouds(image) {
   var qa = image.select('QA60')
   var cloudBitMask = ee.Number(2).pow(10).int()
@@ -1822,6 +1862,9 @@ function maskS2clouds(image) {
       .copyProperties(image, ["system:time_start"])
 }
 
+// This code retrieves a median composite image from the Sentinel-2 ImageCollection ('COPERNICUS/S2') for a specific time period
+// while filtering out cloudy pixels and clipping the result to a specified geometry.
+
 var S2 = ee.ImageCollection("COPERNICUS/S2")
   .filterDate('2021-06-01', '2021-8-31') 
   .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 5))
@@ -1829,28 +1872,38 @@ var S2 = ee.ImageCollection("COPERNICUS/S2")
   .map(maskS2clouds)
   .select(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12' ,'B8A'])
   .median()
-  .clip(geometry)
+  .clip(geometry);
 
 
-// Tasseled Cap
+// Tasseled Cap (Step 1 to 5)
+
+// Step 1: Define a 2D array 'S2_coeff' that contains Tasseled Cap coefficients for spectral transformation.
+
 var S2_coeff = ee.Array([
  [0.0356, 0.0822, 0.1360, 0.2611, 0.2964, 0.3338, 0.3877, 0.3895, 0.949, 0.0009, 0.3882, 0.1366, 0.4750],
  [-0.0635, -0.1128, -0.1680, -0.3480, -0.3303, 0.0852, 0.3302, 0.3165, 0.0467 ,-0.0009, -0.4578, -0.4064, 0.3625],
  [0.0649, 0.1363, 0.2802, 0.3072, 0.5288, 0.1379, -0.0001, -0.0807, -0.0302, 0.0003, -0.4064, -0.5602, -0.1389],
 ]);
 
+// Step 2: Convert the 2D array 'S2_coeff' to a 1D array 'arrayImage1D'.
 
 var arrayImage1D = S2.toArray();
 print(arrayImage1D)
   
+// Step 3: Convert the 1D array 'arrayImage1D' to a 2D array 'arrayImage2D'.
+
 var arrayImage2D = arrayImage1D.toArray(1); 
+
+// Step 4: Perform a matrix multiplication of 'S2_coeff' and 'arrayImage2D', then project and flatten the resulting array into an image.
  
 var componentsImage = ee.Image(S2_coeff)
   .matrixMultiply(arrayImage2D)
   .arrayProject([0])
   .arrayFlatten(
-    [['brightness', 'greenness', 'wetness']])
-  
+    [['brightness', 'greenness', 'wetness']]);
+
+
+// Step 5: Define visualization parameters for the components image.
 
 var vizParams = {
   bands: ['brightness', 'greenness', 'wetness'],
@@ -1858,14 +1911,18 @@ var vizParams = {
   max: [1.5125, 0.1667, 0.0968]
 };
 
+
+// Add Sentinel-2 and its Tasseled Cap components to the map with specified visualization parameters.
+
 Map.addLayer(S2, {bands: ['B8', 'B4', 'B3'], min: 0, max: 0.5}, 'S2', false);
 Map.addLayer(componentsImage, vizParams, 'components', false);
 
+// Define training classes, color map, and merge Sentinel-1 and Tasseled Cap components.
 // Input your classes here
-var landcover_train = ee.FeatureCollection
-(Desertified.merge(Treecover.merge(Cropland.merge(Builtup.merge(Bare)))))
+var landcover_train = ee.FeatureCollection(Desertified.merge(Treecover.merge(Cropland.merge(Builtup.merge(Bare)))));
 print(landcover_train)
 
+// Define a color map for visualization.
 var sld_intervals =
 '<RasterSymbolizer>' +
   '<ColorMap type="intervals" extended="false">' +
@@ -1877,35 +1934,35 @@ var sld_intervals =
   '</ColorMap>' +
 '</RasterSymbolizer>';
 
-//Sentinel-1
+// Load Sentinel-1 data.
 var sentinel1 = ee.ImageCollection('COPERNICUS/S1_GRD')
                     .filterDate('2021-06-01', '2021-8-31');
 
-var vvVhIw = sentinel1
+// Filter Sentinel-1 data by polarization and mode.
+var vvIw = sentinel1
   .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
-  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))
   .filter(ee.Filter.eq('instrumentMode', 'IW'));
-  
-var vvVhIwAsc = vvVhIw.filter(
+
+// Separate ascending and descending orbits.
+var vvIwAsc = vvIw.filter(
   ee.Filter.eq('orbitProperties_pass', 'ASCENDING'));
-var vvVhIwDesc = vvVhIw.filter(
+var vvIwDesc = vvIw.filter(
   ee.Filter.eq('orbitProperties_pass', 'DESCENDING'));
 
-var vvIwAscDescMean = vvVhIwAsc.merge(vvVhIwDesc).select('VV').mean();
- 
-var merged = ee.Image
-(componentsImage.addBands
-(S2.addBands
-(vvIwAscDescMean)))
+// Calculate the mean of VV polarization for both orbits.
+var vvIwAscDescMean = vvIwAsc.merge(vvIwDesc).mean();
 
+// Merge Tasseled Cap components and Sentinel data.
+var merged = ee.Image(componentsImage.addBands(S2.addBands(vvIwAscDescMean)));
 
-// training
+// Training data sampling.
 var training = merged.sampleRegions({
   collection: landcover_train,
   properties: ['landcover'],
   scale: 10
 });
  
+// Train a Random Forest classifier.
 var classifier = ee.Classifier.smileRandomForest(10)
     .train({
       features: training,
@@ -1916,11 +1973,12 @@ var classifier = ee.Classifier.smileRandomForest(10)
 // Classify the input imagery.
 var classified = merged.classify(classifier);
  
- Map.addLayer(classified.sldStyle(sld_intervals), {}, 'RF_class2', false)
+// Add classified image to the map with styling.
+Map.addLayer(classified.sldStyle(sld_intervals), {}, 'RF_class2', false)
 
-var desert = classified.eq(110)
+// Display desert regions.
+var desert = classified.eq(110);
 Map.addLayer(desert.mask(desert), {palette: 'F87A2D'}, 'desert', false)
  
- 
+// Center the map on a specific geometry.
 Map.centerObject(geometry)
-
