@@ -1,15 +1,21 @@
-#### GOOGLE COLAB SCRIPT CODE #####
+"""
+This code was developed to accompany the paper Rayne L. et al. "*Detecting desertification in the ancient oases of Southern Morocco*".
 """
 
-## Mounting your Google Drive in the runtime's virtual machine (Avoid this passage if you run the code in a local Jupyter Notebook session)
+## Mounting your Google Drive in the runtime's virtual machine
 
+# Import the drive module from google.colab
 from google.colab import drive
+
+# Mount Google Drive to the '/content/drive' directory
 drive.mount('/content/drive')
 
-## Install Python Modules
+## Install Python Modules via pip
 
 ! pip install geemap
 ! pip install geetools
+
+#### Info about the module GeeMap are available here: https://geemap.org/
 
 ## Import Python Modules
 
@@ -22,19 +28,21 @@ import os
 
 Map = geemap.Map()
 
-"""*The* first 6 code's cells pertain to the AOI and to the landcover types' polygons used in the training of the RF algorithm. To skip to the *Desertification detection script*, click --> [**HERE**](https://colab.research.google.com/drive/1SdhjNQsOdXIzhT1JDPZVtkk1Vw6mtkQ9#scrollTo=dfMzRGjz5v8Y&line=4&uniqifier=1)) 
+"""*The* first 6 code's cells pertain to the AOI and to the landcover types' polygons used in the training of the RF algorithm. To skip to the *Desertification detection script*, click --> [**HERE**](https://colab.research.google.com/drive/1SdhjNQsOdXIzhT1JDPZVtkk1Vw6mtkQ9#scrollTo=dfMzRGjz5v8Y&line=4&uniqifier=1))
 <--
 
 Otherwise, to modify the script, input your own AOI and training data.
 """
 
-# Default AOI
+# Default AOI (Area Of Interest)
 
 AOI = ee.Geometry.Polygon(
     [[[-6.645711177723698, 31.149571703840472],
       [-6.645711177723698, 31.007255068271363],
       [-6.529668086903386, 31.007255068271363],
-      [-6.529668086903386, 31.149571703840472]]], None, False)
+      [-6.529668086903386, 31.149571703840472]]], None, False);
+
+## Define the "Builtup" Feature: here, we are defining a collection of features, each representing a built-up area, with associated geometries and properties.
 
 Builtup = ee.FeatureCollection([
 ee.Feature(
@@ -422,7 +430,9 @@ ee.Feature(
       "landcover": 150,
       "system:index": "37"
     })
-])
+]);
+
+## Define the "Bare" Feature: here, we are defining a collection of features, each representing a bare land area, with associated geometries and properties.
 
 Bare = ee.FeatureCollection([
 ee.Feature(
@@ -790,7 +800,9 @@ ee.Feature(
          "landcover": 60,
          "system:index": "34"
        })
-])
+]);
+
+## Define Treecover Feature: Here, we are defining a collection of features, each representing an area with tree cover, with associated geometries and properties.
 
 Treecover = ee.FeatureCollection([
 ee.Feature(
@@ -1097,7 +1109,9 @@ ee.Feature(
          "landcover": 10,
          "system:index": "29"
        })
-])
+]);
+
+## Define Cropland Feature: here we are defining a collection of features, each representing an area of cropland, with associated geometries and properties.
 
 Cropland = ee.FeatureCollection([
 ee.Feature(
@@ -1404,7 +1418,9 @@ ee.Feature(
           "landcover": 40,
           "system:index": "29"
         })
-])
+]);
+
+## Define Desertified Feature: here we are defining a collection of features, each representing an area of desertification, with associated geometries and properties.
 
 Desertified = ee.FeatureCollection([
 ee.Feature(
@@ -1828,7 +1844,7 @@ ee.Feature(
             "landcover": 110,
             "system:index": "40"
            })
-])
+]);
 
 """**Desertification detection script** developed by dr Louise Rayne* and edited in Colab by dr Filippo Brandolini^ (School of History, Classics and Archaeology, Newcastle University - Newcastle upon Tyne, UK)
 
@@ -1837,18 +1853,28 @@ ee.Feature(
 ^filippo.brandolini@newcastle.ac.uk
 """
 
-#Sentinel-2
+## # Function to mask clouds in Sentinel-2 imagery and extract desired bands
+## Load, filter, and process Sentinel-2 imagery for a specific time period and area of interest (AOI)
+
+# Sentinel-2 Cloud Masking Function
 def maskS2clouds(image):
+  # Select the QA60 band
   qa = image.select('QA60')
+
+  # Define cloud and cirrus bit masks
   cloudBitMask = ee.Number(2).pow(10).int()
   cirrusBitMask = ee.Number(2).pow(11).int()
+
+  # Create a mask to exclude cloudy and cirrus pixels
   mask = qa.bitwiseAnd(cloudBitMask).eq(0).And(
              qa.bitwiseAnd(cirrusBitMask).eq(0))
+
+  # Apply the mask, scale the image, and select specific bands
   return image.updateMask(mask).divide(10000) \
       .select("B.*") \
-      .copyProperties(image, ["system:time_start"])
+      .copyProperties(image, ["system:time_start"]);
 
-
+# Load Sentinel-2 imagery
 S2 = ee.ImageCollection("COPERNICUS/S2") \
   .filterDate('2021-06-01', '2021-8-31') \
   .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 5)) \
@@ -1856,38 +1882,49 @@ S2 = ee.ImageCollection("COPERNICUS/S2") \
   .map(maskS2clouds) \
   .select(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12' ,'B8A']) \
   .median() \
-  .clip(AOI)
+  .clip(AOI);
 
-# Tasseled Cap
+# Calculate Tasseled Cap components and set visualization parameters
+
+# Tasseled Cap coefficients for brightness, greenness, and wetness
 S2_coeff = ee.Array([
  [0.0356, 0.0822, 0.1360, 0.2611, 0.2964, 0.3338, 0.3877, 0.3895, 0.949, 0.0009, 0.3882, 0.1366, 0.4750],
  [-0.0635, -0.1128, -0.1680, -0.3480, -0.3303, 0.0852, 0.3302, 0.3165, 0.0467 ,-0.0009, -0.4578, -0.4064, 0.3625],
  [0.0649, 0.1363, 0.2802, 0.3072, 0.5288, 0.1379, -0.0001, -0.0807, -0.0302, 0.0003, -0.4064, -0.5602, -0.1389],
-])
+]);
 
+# Convert the Sentinel-2 image to a 1D array
 
-arrayImage1D = S2.toArray()
+arrayImage1D = S2.toArray();
+
+## Uncomment (i.e. remove the # symbol) the line below to print the 1D array data
 #print(arrayImage1D)
 
-arrayImage2D = arrayImage1D.toArray(1)
+# Convert the 1D array to a 2D array
+arrayImage2D = arrayImage1D.toArray(1);
 
+# Perform matrix multiplication with Tasseled Cap coefficients
 componentsImage = ee.Image(S2_coeff) \
   .matrixMultiply(arrayImage2D) \
   .arrayProject([0]) \
   .arrayFlatten(
-    [['brightness', 'greenness', 'wetness']])
+    [['brightness', 'greenness', 'wetness']]);
 
-
+# Visualization parameters for the Tasseled Cap components
 vizParams = {
   'bands': ['brightness', 'greenness', 'wetness'],
   'min': [0.3754, -0.3038, -0.1134],
   'max': [1.5125, 0.1667, 0.0968]
-}
+};
+
+# Merge and prepare input classes, define color map, and combine Sentinel-1 and Sentinel-2 data
 
 # Input your classes here
-landcover_train = Desertified.merge(Treecover).merge(Cropland).merge(Builtup).merge(Bare)
-#print(landcover_train)
 
+# Merge different land cover classes (Desertified, Treecover, Cropland, Builtup, Bare)
+landcover_train = Desertified.merge(Treecover).merge(Cropland).merge(Builtup).merge(Bare)
+
+# Define a color map for visualizing land cover classes
 sld_intervals = '<RasterSymbolizer>' + \
   '<ColorMap type="intervals" extended="False">' + \
     '<ColorMapEntry color="#ff7043" quantity="150" label="Builtup"/>' + \
@@ -1898,57 +1935,79 @@ sld_intervals = '<RasterSymbolizer>' + \
   '</ColorMap>' + \
 '</RasterSymbolizer>'
 
-#Sentinel-1
+# Sentinel-1 data collection
 sentinel1 = ee.ImageCollection('COPERNICUS/S1_GRD') \
                     .filterDate('2021-06-01', '2021-8-31')
 
-vvVhIw = sentinel1 \
+# Filter Sentinel-1 data for VV and VH polarizations in IW (Interferometric Wide) mode
+vvIw = sentinel1 \
   .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')) \
-  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH')) \
-  .filter(ee.Filter.eq('instrumentMode', 'IW'))
+    .filter(ee.Filter.eq('instrumentMode', 'IW'))
 
-vvVhIwAsc = vvVhIw.filter(
+# Separate Sentinel-1 data into ascending and descending passes
+vvIwAsc = vvIw.filter(
   ee.Filter.eq('orbitProperties_pass', 'ASCENDING'))
-vvVhIwDesc = vvVhIw.filter(
+vvIwDesc = vvIw.filter(
   ee.Filter.eq('orbitProperties_pass', 'DESCENDING'))
 
-vvIwAscDescMean = vvVhIwAsc.merge(vvVhIwDesc).select('VV').mean()
+# Calculate the mean of VV polarization for both ascending and descending passes
+vvIwAscDescMean = vvIwAsc.merge(vvIwDesc).select('VV').mean()
 
+# Combine Tasseled Cap components from Sentinel-2, Sentinel-2 bands, and mean VV polarization from Sentinel-1 merged_image
 merged_image = ee.Image(componentsImage.addBands(S2.addBands(vvIwAscDescMean)))
 
-# training
+# # Train a Random Forest classifier and classify the input imagery to identify desertified areas
+
+# Sample regions from the merged image based on the provided land cover classes
 training = merged_image.sampleRegions(**{
   'collection': landcover_train,
   'properties': ['landcover'],
   'scale': 10
-})
+});
 
-#print(training)
+## Uncomment (i.e. remove the # symbol) the line below to print the sampled training data
 
+# print(training)
+
+# Create a Random Forest classifier with 10 trees and train it using the training data
 classifier = ee.Classifier.smileRandomForest(10).train(**{
     'features': training,
     'classProperty': 'landcover',
     'inputProperties': ['brightness', 'greenness', 'wetness', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12' ,'B8A', 'VV']
-    })
+});
 
-# Classify the input imagery.
-classified = merged_image.classify(classifier)
+# Classify the input imagery using the trained classifier
+classified = merged_image.classify(classifier);
 
-desert = classified.eq(110)
+# Create a binary image where desertified areas are represented as '1'
+desert = classified.eq(110);
 
-Map.addLayer(S2, {'bands': ['B8',  'B4',  'B3'], 'min': 0, 'max': 0.5}, 'S2', False)
+# Add and visualize Sentinel-2 imagery, Tasseled Cap components, Random Forest classification, and desertified areas on the map
+
+# Add Sentinel-2 imagery with specific bands and visualization parameters
+Map.addLayer(S2, {'bands': ['B8', 'B4', 'B3'], 'min': 0, 'max': 0.5}, 'S2', False)
+
+# Add Tasseled Cap components image with predefined visualization parameters
 Map.addLayer(componentsImage, vizParams, 'components', False)
+
+# Add the Random Forest classification results with the defined color map
 Map.addLayer(classified.sldStyle(sld_intervals), {}, 'RF_class2', False)
+
+# Add a binary layer to visualize desertified areas with a specific color palette
 Map.addLayer(desert.mask(desert), {'palette': 'F87A2D'}, 'desert', True)
+
+# Center the map view on the Area of Interest (AOI) with a specified zoom level
 Map.centerObject(AOI, 14)
+
+# Display the map
 Map
 
-#Set Coordinates Reference Systems (CRS), For example: Morocco --> 'EPSG:32628';  WGS 84 --> 'EPSG:4326'.
+## Set Coordinates Reference Systems (CRS), For example: Morocco --> 'EPSG:32628';  WGS 84 --> 'EPSG:4326'.
 
 pjcrs = 'EPSG:32628'
 
 ## Generate image download URL. If your ara running the code in Google Colab, the outputs are saved automatically in the sample_data folder in your Drive
 
-geemap.ee_export_image(ee_object= componentsImage, filename='componentsImage.tif',scale=200,crs= pjcrs,region= AOI, file_per_band= False)
-geemap.ee_export_image(ee_object= desert, filename='desert.tif',scale=20,crs= pjcrs,region= AOI, file_per_band= False)
-geemap.ee_export_image(ee_object= S2, filename='S2.tif',scale=20,crs= pjcrs,region= AOI, file_per_band= False)
+geemap.ee_export_image(ee_object= componentsImage, filename='componentsImage.tif',scale=200,crs= pjcrs,region= AOI, file_per_band= False);
+geemap.ee_export_image(ee_object= desert, filename='desert.tif',scale=20,crs= pjcrs,region= AOI, file_per_band= False);
+geemap.ee_export_image(ee_object= S2, filename='S2.tif',scale=20,crs= pjcrs,region= AOI, file_per_band= False);
